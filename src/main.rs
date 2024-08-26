@@ -33,7 +33,7 @@ const INITIAL_SCREEN_H: u32 = 600;
 // Get the size of an arbitrary array of numbers measured in bytes
 // Example usage:  byte_size_of_array(my_array)
 fn byte_size_of_array<T>(val: &[T]) -> isize {
-    std::mem::size_of_val(&val[..]) as isize
+    std::mem::size_of_val(val) as isize
 }
 
 // Get the OpenGL-compatible pointer to an arbitrary array of numbers
@@ -54,25 +54,56 @@ fn offset<T>(n: u32) -> *const c_void {
     (n * mem::size_of::<T>() as u32) as *const T as *const c_void
 }
 
-// Get a null pointer (equivalent to an offset of 0)
-// ptr::null()
-
 // == // Generate your VAO here
-unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
-    // Implement me!
-
+unsafe fn create_vao(vertices: &[f32], indices: &[u32]) -> u32 {
     // Also, feel free to delete comments :)
 
     // This should:
     // * Generate a VAO and bind it
-    // * Generate a VBO and bind it
-    // * Fill it with data
-    // * Configure a VAP for the data and enable it
-    // * Generate a IBO and bind it
-    // * Fill it with data
-    // * Return the ID of the VAO
+    let mut vao_id = 0_u32;
+    unsafe {
+        gl::GenVertexArrays(1, &mut vao_id);
+        gl::BindVertexArray(vao_id);
+    }
 
-    0
+    // * Fill it with data
+    let mut buffer_id = 0_u32;
+    unsafe {
+        gl::GenBuffers(1, &mut buffer_id);
+        gl::BindBuffer(gl::ARRAY_BUFFER, buffer_id);
+        gl::BufferData(
+            gl::ARRAY_BUFFER,
+            std::mem::size_of_val(vertices) as isize,
+            vertices.as_ptr() as *const c_void,
+            gl::STATIC_DRAW,
+        );
+    }
+
+    // * Configure a VAP for the data and enable it
+    unsafe {
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, ptr::null());
+        gl::EnableVertexAttribArray(0);
+    }
+
+    // * Generate a IBO and bind it
+    let mut ibo_id = 0_u32;
+    unsafe {
+        gl::GenBuffers(1, &mut ibo_id);
+        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ibo_id);
+    }
+
+    // * Fill it with data
+    unsafe {
+        gl::BufferData(
+            gl::ELEMENT_ARRAY_BUFFER,
+            std::mem::size_of_val(indices) as isize,
+            indices.as_ptr() as *const c_void,
+            gl::STATIC_DRAW,
+        );
+    }
+
+    // * Return the ID of the VAO
+    vao_id
 }
 
 fn main() {
@@ -145,7 +176,11 @@ fn main() {
 
         // == // Set up your VAO around here
 
-        let my_vao = unsafe { 1337 };
+        let triangle = unsafe {
+            let vertices = vec![-0.6, -0.6, 0.0, 0.6, -0.6, 0.0, 0.0, 0.6, 0.0];
+            let indices = vec![0, 1, 2];
+            create_vao(&vertices, &indices)
+        };
 
         // == // Set up your shaders here
 
@@ -156,13 +191,13 @@ fn main() {
         // This snippet is not enough to do the exercise, and will need to be modified (outside
         // of just using the correct path), but it only needs to be called once
 
-        /*
         let simple_shader = unsafe {
             shader::ShaderBuilder::new()
-                .attach_file("./path/to/simple/shader.file")
+                .attach_file("./shaders/simple.vert")
+                .attach_file("./shaders/simple.frag")
                 .link()
+                .activate()
         };
-        */
 
         // Used to demonstrate keyboard handling for exercise 2.
         let mut _arbitrary_number = 0.0; // feel free to remove
@@ -224,6 +259,8 @@ fn main() {
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
                 // == // Issue the necessary gl:: commands to draw your scene here
+                gl::BindVertexArray(triangle);
+                gl::DrawElements(gl::TRIANGLES, 3, gl::UNSIGNED_INT, ptr::null());
             }
 
             // Display the new color buffer on the display
